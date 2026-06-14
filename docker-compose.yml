@@ -1,0 +1,77 @@
+services:
+  # ---------- PostgreSQL ----------
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-xeno}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-xeno_password}
+      POSTGRES_DB: ${POSTGRES_DB:-xeno_crm}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-xeno} -d ${POSTGRES_DB:-xeno_crm}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - xeno-net
+
+  # ---------- CRM API ----------
+  crm-api:
+    build:
+      context: ./Backend/crm
+      dockerfile: Dockerfile
+      target: api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-xeno}:${POSTGRES_PASSWORD:-xeno_password}@postgres:5432/${POSTGRES_DB:-xeno_crm}
+      CHANNEL_SERVICE_URL: http://channel:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - xeno-net
+
+  # ---------- Channel Simulator ----------
+  channel:
+    build:
+      context: ./Backend/channel
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    environment:
+      CRM_SERVICE_URL: http://crm-api:3000
+    networks:
+      - xeno-net
+
+  # ---------- Frontend ----------
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    env_file:
+      - .env
+    networks:
+      - xeno-net
+
+volumes:
+  pgdata:
+
+networks:
+  xeno-net:
+    driver: bridge

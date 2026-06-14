@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─── Frontend (Vite + React) ────────────────────────────────────
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: Frontend/node_modules
+          key: frontend-nm-${{ hashFiles('Frontend/package-lock.json') }}
+          restore-keys: frontend-nm-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+  # ─── Backend – CRM (NestJS) ────────────────────────────────────
+  backend-crm:
+    name: Backend CRM
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Backend/crm
+    env:
+      DATABASE_URL: postgresql://user:password@localhost:5432/xeno_ci?schema=public
+      DIRECT_URL: postgresql://user:password@localhost:5432/xeno_ci?schema=public
+      JWT_SECRET: ci-dummy-jwt-secret-for-testing-only
+      SEED_ADMIN_PASSWORD: ci-dummy-admin-password
+      CHANNEL_WEBHOOK_SECRET: ci-dummy-webhook-secret
+      ANTHROPIC_BASE_URL: https://api.example.com/anthropic
+      XIAOMI_AUTH_TOKEN: ci-dummy-token
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: Backend/crm/node_modules
+          key: backend-crm-nm-${{ hashFiles('Backend/crm/package-lock.json') }}
+          restore-keys: backend-crm-nm-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+  # ─── Backend – Channel (NestJS) ────────────────────────────────
+  backend-channel:
+    name: Backend Channel
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Backend/channel
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: Backend/channel/node_modules
+          key: backend-channel-nm-${{ hashFiles('Backend/channel/package-lock.json') }}
+          restore-keys: backend-channel-nm-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+  # ─── Gate: all jobs must pass before merge ─────────────────────
+  all-passed:
+    name: All Passed
+    if: always()
+    needs: [frontend, backend-crm, backend-channel]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [ "${{ needs.frontend.result }}" != "success" ] || \
+             [ "${{ needs.backend-crm.result }}" != "success" ] || \
+             [ "${{ needs.backend-channel.result }}" != "success" ]; then
+            echo "::error::One or more required jobs failed"
+            exit 1
+          fi
+          echo "All three packages passed CI."
