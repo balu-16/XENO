@@ -194,7 +194,7 @@ The copilot operates within strict safety limits:
 | Max tool calls per message | 8 | `AI_MAX_TOOL_CALLS` |
 | Max execution time | 25s | `AI_MAX_EXECUTION_MS` |
 | Max input tokens per call | 100,000 | `AI_MAX_INPUT_TOKENS` |
-| Max total tokens per query | 50,000 | `AI_MAX_TOKENS_PER_QUERY` |
+| Max total tokens per query | 150,000 | `AI_MAX_TOKENS_PER_QUERY` |
 | Confirmation TTL | 15 min | `AI_CONFIRMATION_TTL_MS` |
 | History context window | 40 messages | `AI_HISTORY_LIMIT` |
 | Request log size | 200 entries | `AI_REQUEST_LOG_LIMIT` |
